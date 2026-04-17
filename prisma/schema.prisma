@@ -1,0 +1,119 @@
+// ==========================================
+// CONFIGURACIÓN INICIAL
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMERACIONES
+// ==========================================
+
+enum Role {
+  OWNER
+  ADMIN
+  WAITER
+  KITCHEN
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+// ==========================================
+// MÓDULO DE USUARIOS Y AUTENTICACIÓN
+// ==========================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  restaurants        RestaurantUser[]
+  ownedRestaurants   Restaurant[]        @relation("UserOwnedRestaurants")
+  inventoryMovements InventoryMovement[]
+}
+
+// ==========================================
+// MÓDULO DE NEGOCIO (RESTAURANTES)
+// ==========================================
+
+model Restaurant {
+  id        String   @id @default(uuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  owner              User                @relation("UserOwnedRestaurants", fields: [ownerId], references: [id])
+  users              RestaurantUser[]
+  products           Product[]
+  inventoryMovements InventoryMovement[]
+}
+
+model RestaurantUser {
+  id           String @id @default(uuid())
+  userId       String
+  restaurantId String
+  role         Role   @default(WAITER)
+
+  // Relaciones
+  user       User       @relation(fields: [userId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([userId, restaurantId])
+}
+
+// ==========================================
+// MÓDULO DE INVENTARIO Y CATÁLOGO
+// ==========================================
+
+model Product {
+  id           String   @id @default(uuid())
+  name         String
+  price        Float
+  stock        Int      @default(0)
+  restaurantId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  restaurant Restaurant          @relation(fields: [restaurantId], references: [id])
+  movements  InventoryMovement[]
+
+  @@index([restaurantId])
+}
+
+model InventoryMovement {
+  id           String       @id @default(uuid())
+  productId    String
+  restaurantId String
+  userId       String       
+  type         MovementType
+  quantity     Int
+  reason       String?
+
+  createdAt    DateTime     @default(now())
+
+  // Relaciones
+  product    Product    @relation(fields: [productId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  user       User       @relation(fields: [userId], references: [id]) 
+
+  // Índices para búsquedas rápidas
+  @@index([productId])
+  @@index([restaurantId])
+  @@index([userId])        
+}
